@@ -398,10 +398,10 @@ export default function App() {
           
           <div className={cn(
             "px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border-2 flex items-center gap-3 transition-all",
-            gameState.currentPlayer === 'X' ? "border-blue-500/30 text-blue-400 bg-blue-500/5" : "border-pink-500/30 text-pink-400 bg-pink-500/5",
+            gameState.currentPlayer === 'X' ? "border-blue-500/30 text-blue-400 bg-blue-500/10" : "border-pink-500/30 text-pink-400 bg-pink-500/10",
             isWaiting && "opacity-0"
           )}>
-            <span>Au tour de {gameState.currentPlayer}</span>
+            <span>{gameState.playerInfo[gameState.currentPlayer!].name}</span>
             <div className="w-px h-3 bg-white/10" />
             <div className="flex items-center gap-1.5 min-w-[45px]">
               <Clock className={cn("w-3 h-3", gameState.timeLeft <= 2 ? "text-red-500 animate-pulse" : "opacity-50")} />
