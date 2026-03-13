@@ -110,7 +110,7 @@ const PlayerCard = ({
       <div className="flex flex-col gap-4">
         <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Pouvoirs</h4>
         <div className="flex gap-3">
-          {powerUps.map((p) => (
+          {powerUps.map((p, idx) => (
             <div key={p.id} className="relative group">
               <button
                 onClick={() => onPowerUpClick(p.id)}
@@ -127,6 +127,11 @@ const PlayerCard = ({
                 <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-4.5 px-1 bg-slate-700 rounded-full text-[8px] flex items-center justify-center font-black border-2 border-slate-900 text-white">
                   {p.count}
                 </span>
+                {isTurn && (
+                  <span className="absolute -bottom-1 -right-1 text-[7px] font-black bg-white/10 px-1 rounded-sm border border-white/5 text-white/40">
+                    {p.id === 'sabotage' ? '1' : p.id === 'block' ? '2' : '3'}
+                  </span>
+                )}
               </button>
               
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-3 py-2 bg-slate-800 border border-white/10 rounded-lg text-[10px] w-32 text-center pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-[100] shadow-2xl">
@@ -225,6 +230,28 @@ export default function App() {
   };
 
   useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (gameState.status !== 'playing' || gameState.isPaused) return;
+      
+      const pX = gameState.powerUps[gameState.currentPlayer!];
+      
+      if (e.code === 'Digit1' || e.code === 'Numpad1') {
+        const p = pX.find(p => p.id === 'sabotage');
+        if (p) handlePowerUpClick('sabotage', gameState.currentPlayer);
+      } else if (e.code === 'Digit2' || e.code === 'Numpad2') {
+        const p = pX.find(p => p.id === 'block');
+        if (p) handlePowerUpClick('block', gameState.currentPlayer);
+      } else if (e.code === 'Digit3' || e.code === 'Numpad3') {
+        const p = pX.find(p => p.id === 'swap');
+        if (p) handlePowerUpClick('swap', gameState.currentPlayer);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [gameState.status, gameState.isPaused, gameState.currentPlayer, gameState.powerUps, activePowerUp]);
+
+  useEffect(() => {
     if (gameState.status !== 'playing' || gameState.isPaused) return;
     
     const interval = setInterval(() => {
@@ -232,6 +259,7 @@ export default function App() {
         if (prev.isPaused) return prev;
         if (prev.timeLeft <= 0) {
           // Time's up, switch player
+          setActivePowerUp(null); // Force deselect on timeout
           const nextLimit = prev.nextTurnTimeLimit || 5;
           return {
             ...prev,
@@ -292,11 +320,18 @@ export default function App() {
 
   const handlePowerUpClick = (powerUpId: string, player: Player) => {
     if (gameState.currentPlayer !== player || gameState.status !== 'playing') return;
+    
+    // Toggle: if clicking the same power-up BY THE SAME PLAYER, deselect it
+    if (activePowerUp?.id === powerUpId && activePowerUp?.player === player) {
+      setActivePowerUp(null);
+      return;
+    }
+
     if (powerUpId === 'sabotage') {
       applySabotage(player);
       return;
     }
-    setActivePowerUp(activePowerUp?.id === powerUpId ? null : { id: powerUpId, player });
+    setActivePowerUp({ id: powerUpId, player });
   };
 
   const applySabotage = (currentPlayer: Player) => {
@@ -361,6 +396,7 @@ export default function App() {
   };
 
   const endTurn = (newBoard: any, newPowerUps: any) => {
+    setActivePowerUp(null); // Force clear on turn end
     setGameState(prev => {
       const boardWithUpdatedBlocks = newBoard.map((grid: any) => ({
         ...grid,
