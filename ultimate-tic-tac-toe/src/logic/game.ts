@@ -20,6 +20,13 @@ export interface SmallGrid {
   isFull: boolean;
 }
 
+export interface GameRecord {
+  winner: Player;
+  scoreX: number;
+  scoreO: number;
+  timestamp: number;
+}
+
 export interface GameState {
   board: SmallGrid[];
   currentPlayer: Player;
@@ -37,6 +44,7 @@ export interface GameState {
   timeLeft: number; // Seconds left for current turn
   nextTurnTimeLimit?: number; // Custom limit for the next turn (Sabotage)
   isPaused: boolean;
+  history: GameRecord[];
 }
 
 export const INITIAL_POWER_UPS: PowerUp[] = [
@@ -65,6 +73,7 @@ export const createInitialState = (): GameState => ({
   },
   timeLeft: 5,
   isPaused: true,
+  history: [],
 });
 
 export const checkWin = (cells: (Player | { player: Player })[]): Player => {

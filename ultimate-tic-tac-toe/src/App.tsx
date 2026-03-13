@@ -12,6 +12,8 @@ import {
   Camera,
   Smile,
   Hourglass,
+  BarChart2,
+  PlayCircle,
 } from 'lucide-react';
 import { 
   createInitialState, 
@@ -145,6 +147,7 @@ const PlayerCard = ({
 export default function App() {
   const [gameState, setGameState] = useState<GameState>(createInitialState());
   const [activePowerUp, setActivePowerUp] = useState<{ id: string, player: Player } | null>(null);
+  const [showStats, setShowStats] = useState(false);
   
   // Avatar Editing State
   const [cameraPlayer, setCameraPlayer] = useState<Player>(null);
@@ -258,13 +261,29 @@ export default function App() {
     }));
   };
 
+  const continueGame = () => {
+    setGameState(prev => {
+      const newState = createInitialState();
+      return {
+        ...newState,
+        playerInfo: prev.playerInfo,
+        scores: prev.scores,
+        history: prev.history,
+        status: 'playing', // Start immediately
+        isPaused: false
+      };
+    });
+    setActivePowerUp(null);
+  };
+
   const resetGame = () => {
     setGameState(prev => {
       const newState = createInitialState();
       return {
         ...newState,
         playerInfo: prev.playerInfo,
-        scores: prev.scores
+        scores: { X: 0, O: 0 },
+        history: []
       };
     });
     setActivePowerUp(null);
@@ -343,18 +362,60 @@ export default function App() {
       const winners = boardWithWinners.map((g: any) => g.winner);
       const overallWinner = checkWin(winners);
       let nextStatus: GameStatus = prev.status;
-      if (overallWinner) nextStatus = overallWinner === 'X' ? 'X_wins' : 'O_wins';
-      else if (boardWithWinners.every((g: any) => g.winner || g.isFull)) nextStatus = 'draw';
+      let finalScores = { ...prev.scores };
+      let newHistory = [...prev.history];
+
+      if (overallWinner) {
+        nextStatus = overallWinner === 'X' ? 'X_wins' : 'O_wins';
+        
+        const gridsX = boardWithWinners.filter((g: any) => g.winner === 'X').length;
+        const gridsO = boardWithWinners.filter((g: any) => g.winner === 'O').length;
+        
+        const pointsX = gridsX + (overallWinner === 'X' ? 2 : 0);
+        const pointsO = gridsO + (overallWinner === 'O' ? 2 : 0);
+        
+        finalScores = { 
+          X: prev.scores.X + pointsX, 
+          O: prev.scores.O + pointsO 
+        };
+        
+        newHistory.push({
+          winner: overallWinner,
+          scoreX: pointsX,
+          scoreO: pointsO,
+          timestamp: Date.now()
+        });
+      } else if (boardWithWinners.every((g: any) => g.winner || g.isFull)) {
+        nextStatus = 'draw';
+        const gridsX = boardWithWinners.filter((g: any) => g.winner === 'X').length;
+        const gridsO = boardWithWinners.filter((g: any) => g.winner === 'O').length;
+        finalScores = { 
+          X: prev.scores.X + gridsX, 
+          O: prev.scores.O + gridsO 
+        };
+        
+        newHistory.push({
+          winner: null,
+          scoreX: gridsX,
+          scoreO: gridsO,
+          timestamp: Date.now()
+        });
+      }
+
       const nextLimit = prev.nextTurnTimeLimit || 5;
+
       return {
         ...prev,
         board: boardWithWinners,
         currentPlayer: prev.currentPlayer === 'X' ? 'O' : 'X',
         status: nextStatus,
+        scores: finalScores,
+        history: newHistory,
         powerUps: newPowerUps || prev.powerUps,
         timeLeft: nextLimit,
         nextTurnTimeLimit: undefined,
       };
+
     });
   };
 
@@ -498,9 +559,13 @@ export default function App() {
                   ))}
                   {smallGrid.winner && (
                     <div className="absolute inset-0 flex items-center justify-center bg-slate-950/80 rounded-xl backdrop-blur-[1px] z-10">
-                      <span className={cn("text-3xl font-black italic tracking-tighter", smallGrid.winner === 'X' ? "text-blue-500" : "text-pink-500")}>
+                      <span className={cn(
+                        "text-3xl font-black tracking-tighter",
+                        smallGrid.winner === 'X' ? "text-blue-500" : "text-pink-500"
+                      )}>
                         {smallGrid.winner}
                       </span>
+
                     </div>
                   )}
                 </div>
@@ -526,7 +591,7 @@ export default function App() {
               <div className="pointer-events-auto flex flex-col items-center gap-6">
                 {isGameOver && (
                   <div className="text-center mb-4 space-y-2">
-                    <h2 className="text-5xl font-black italic tracking-tighter text-white uppercase">
+                    <h2 className="text-5xl font-black tracking-tighter text-white uppercase">
                       {gameState.status === 'draw' ? "Match Nul" : "Victoire !"}
                     </h2>
                     <p className="text-slate-400 font-bold tracking-[0.3em] uppercase text-xs">
@@ -535,13 +600,36 @@ export default function App() {
                   </div>
                 )}
                 
-                <button 
-                  onClick={isGameOver ? resetGame : startGame}
-                  className="px-12 py-6 bg-white text-slate-950 rounded-2xl font-black uppercase tracking-[0.2em] text-sm flex items-center justify-center gap-4 hover:scale-110 active:scale-95 transition-all shadow-[0_20px_50px_rgba(255,255,255,0.2)]"
-                >
-                  {isGameOver ? "Nouvelle Partie" : "Prêt"}
-                  <ChevronRight className="w-5 h-5" />
-                </button>
+                {isGameOver ? (
+                  <div className="flex flex-col gap-4 w-full min-w-[200px]">
+                    <button 
+                      onClick={() => setShowStats(true)}
+                      className="w-full py-4 bg-slate-800 text-white rounded-xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3 hover:bg-slate-700 transition-all"
+                    >
+                      <BarChart2 className="w-4 h-4" /> Statistiques
+                    </button>
+                    <button 
+                      onClick={continueGame}
+                      className="w-full py-4 bg-white text-slate-950 rounded-xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3 hover:scale-105 active:scale-95 transition-all shadow-xl"
+                    >
+                      <PlayCircle className="w-4 h-4" /> Continuer
+                    </button>
+                    <button 
+                      onClick={resetGame}
+                      className="w-full py-3 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 hover:text-red-400 transition-colors"
+                    >
+                      Redémarrer
+                    </button>
+                  </div>
+                ) : (
+                  <button 
+                    onClick={startGame}
+                    className="px-12 py-6 bg-white text-slate-950 rounded-2xl font-black uppercase tracking-[0.2em] text-sm flex items-center justify-center gap-4 hover:scale-110 active:scale-95 transition-all shadow-[0_20px_50px_rgba(255,255,255,0.2)]"
+                  >
+                    Prêt
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                )}
               </div>
             </motion.div>
           )}
@@ -557,7 +645,7 @@ export default function App() {
             <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }}
               className="bg-slate-900 p-8 rounded-2xl text-center max-w-sm w-full border border-white/10 shadow-2xl"
             >
-              <h2 className="text-xl font-black mb-6 uppercase italic tracking-tighter text-white">
+              <h2 className="text-xl font-black mb-6 uppercase tracking-tighter text-white">
                 Avatar : {gameState.playerInfo[cameraPlayer!].name}
               </h2>
               {!isEmojiPickerOpen ? (
@@ -588,6 +676,71 @@ export default function App() {
                 </div>
               )}
               <button onClick={closeCamera} className="mt-6 w-full py-3 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-red-400 transition-colors">Annuler</button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {/* Modal Statistiques */}
+      <AnimatePresence>
+        {showStats && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/98 backdrop-blur-2xl p-6"
+          >
+            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }}
+              className="bg-slate-900 p-8 rounded-3xl max-w-lg w-full border border-white/10 shadow-2xl flex flex-col gap-8"
+            >
+              <div className="text-center space-y-2">
+                <h2 className="text-3xl font-black uppercase tracking-tighter text-white">Statistiques</h2>
+                <p className="text-slate-500 text-xs font-bold tracking-widest uppercase">Historique des sessions</p>
+              </div>
+
+              {/* Total Summary */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-2xl text-center">
+                  <p className="text-[10px] font-black uppercase text-blue-400 mb-1">Total BLEU</p>
+                  <p className="text-3xl font-mono font-black text-white">{gameState.scores.X}</p>
+                </div>
+                <div className="bg-pink-500/10 border border-pink-500/20 p-4 rounded-2xl text-center">
+                  <p className="text-[10px] font-black uppercase text-pink-400 mb-1">Total ROUGE</p>
+                  <p className="text-3xl font-mono font-black text-white">{gameState.scores.O}</p>
+                </div>
+              </div>
+
+              {/* Match List */}
+              <div className="flex-1 overflow-y-auto max-h-[300px] pr-2 custom-scrollbar space-y-3">
+                {gameState.history.length > 0 ? (
+                  [...gameState.history].reverse().map((record, index) => (
+                    <div key={index} className="flex items-center justify-between p-4 bg-white/5 border border-white/5 rounded-xl">
+                      <div className="flex items-center gap-3">
+                        <div className={cn(
+                          "w-2 h-2 rounded-full",
+                          record.winner === 'X' ? "bg-blue-500" : record.winner === 'O' ? "bg-pink-500" : "bg-slate-500"
+                        )} />
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Match #{gameState.history.length - index}</span>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <span className="text-xs font-mono font-bold text-white">
+                          <span className="text-blue-400">{record.scoreX}</span>
+                          <span className="mx-2 text-slate-600">-</span>
+                          <span className="text-pink-400">{record.scoreO}</span>
+                        </span>
+                        <span className="text-[9px] font-bold text-slate-600">
+                          {new Date(record.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-center text-slate-600 py-10 italic text-sm">Aucun match enregistré</p>
+                )}
+              </div>
+
+              <button 
+                onClick={() => setShowStats(false)}
+                className="w-full py-4 bg-white text-slate-950 rounded-xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2 hover:bg-slate-200 transition-all"
+              >
+                Fermer
+              </button>
             </motion.div>
           </motion.div>
         )}
