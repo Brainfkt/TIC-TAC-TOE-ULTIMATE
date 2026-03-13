@@ -26,16 +26,21 @@ export interface GameState {
   nextSmallGridIndex: number | null;
   status: GameStatus;
   scores: { X: number; O: number };
+  playerInfo: {
+    X: { name: string; avatar: string }; // avatar can be dataURI or emoji
+    O: { name: string; avatar: string };
+  };
   powerUps: {
     X: PowerUp[];
     O: PowerUp[];
   };
   timeLeft: number; // Seconds left for current turn
+  nextTurnTimeLimit?: number; // Custom limit for the next turn (Sabotage)
   isPaused: boolean;
 }
 
 export const INITIAL_POWER_UPS: PowerUp[] = [
-  { id: 'erase', name: 'Effaceur', description: 'Supprime une pièce adverse au choix.', count: 1 },
+  { id: 'sabotage', name: 'Sabotage', description: 'Réduit le prochain tour de l\'adversaire à 1 seconde.', count: 1 },
   { id: 'block', name: 'Bloqueur', description: 'Bloque une case pendant 1 tour.', count: 1 },
   { id: 'swap', name: 'Voleur', description: 'Remplace une pièce adverse par la vôtre.', count: 1 },
 ];
@@ -50,6 +55,10 @@ export const createInitialState = (): GameState => ({
   nextSmallGridIndex: null,
   status: 'waiting',
   scores: { X: 0, O: 0 },
+  playerInfo: {
+    X: { name: 'BLEU', avatar: '👤' },
+    O: { name: 'ROUGE', avatar: '👤' },
+  },
   powerUps: {
     X: [...INITIAL_POWER_UPS],
     O: [...INITIAL_POWER_UPS],

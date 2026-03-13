@@ -1,16 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Trophy, 
   RotateCcw, 
   Zap, 
-  Eraser, 
   ChevronRight,
-  User,
   Lock,
   Clock,
   Play,
   Pause,
+  Camera,
+  Smile,
+  Hourglass,
 } from 'lucide-react';
 import { 
   createInitialState, 
@@ -32,18 +33,35 @@ function cn(...inputs: ClassValue[]) {
 
 interface PlayerCardProps {
   player: 'X' | 'O';
+  name: string;
+  avatar: string;
   score: number;
   isTurn: boolean;
   powerUps: PowerUp[];
   onPowerUpClick: (id: string) => void;
   activePowerUpId: string | null;
+  onAvatarClick: () => void;
+  isEditable: boolean;
 }
 
-const PlayerCard = ({ player, score, isTurn, powerUps, onPowerUpClick, activePowerUpId }: PlayerCardProps) => {
+const PlayerCard = ({ 
+  player, 
+  name, 
+  avatar, 
+  score, 
+  isTurn, 
+  powerUps, 
+  onPowerUpClick, 
+  activePowerUpId,
+  onAvatarClick,
+  isEditable
+}: PlayerCardProps) => {
   const isX = player === 'X';
   const color = isX ? "text-blue-400" : "text-pink-400";
   const bgActive = isX ? "bg-blue-500/20" : "bg-pink-500/20";
   const borderActive = isX ? "border-blue-500" : "border-pink-500";
+
+  const isDataURI = avatar.startsWith('data:image');
 
   return (
     <div className={cn(
@@ -51,12 +69,30 @@ const PlayerCard = ({ player, score, isTurn, powerUps, onPowerUpClick, activePow
       isTurn ? cn("bg-slate-800/80 border-2", borderActive) : "bg-slate-900 border-white/10 opacity-60"
     )}>
       <div className="flex items-center gap-3 mb-4">
-        <div className={cn("p-2 rounded-lg", bgActive)}>
-          <User className={cn("w-5 h-5", color)} />
-        </div>
+        <button 
+          onClick={onAvatarClick}
+          disabled={!isEditable}
+          className={cn(
+            "relative w-12 h-12 rounded-lg flex items-center justify-center transition-all overflow-hidden border-2 group",
+            bgActive,
+            isTurn ? borderActive : "border-white/10",
+            isEditable ? "hover:border-white/30 cursor-pointer" : "cursor-default"
+          )}
+        >
+          {isDataURI ? (
+            <img src={avatar} alt={name} className="w-full h-full object-cover" />
+          ) : (
+            <span className="text-2xl">{avatar}</span>
+          )}
+          {isEditable && (
+            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+              <Camera className="w-4 h-4 text-white" />
+            </div>
+          )}
+        </button>
         <div>
           <h3 className="text-[9px] font-black uppercase tracking-widest text-slate-400">Joueur</h3>
-          <p className={cn("text-lg font-black tracking-tight leading-none", color)}>{player}</p>
+          <p className={cn("text-lg font-black tracking-tight leading-none", color)}>{name}</p>
         </div>
       </div>
 
@@ -79,7 +115,7 @@ const PlayerCard = ({ player, score, isTurn, powerUps, onPowerUpClick, activePow
                     : "bg-slate-800 border-white/10 hover:border-white/20 active:scale-90"
                 )}
               >
-                {p.id === 'erase' && <Eraser className={cn("w-4 h-4", color)} />}
+                {p.id === 'sabotage' && <Hourglass className={cn("w-4 h-4", color)} />}
                 {p.id === 'block' && <Lock className={cn("w-4 h-4", color)} />}
                 {p.id === 'swap' && <Zap className={cn("w-4 h-4", color)} />}
                 <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 bg-slate-700 rounded-full text-[8px] flex items-center justify-center font-black border border-slate-900 text-white">
@@ -105,6 +141,67 @@ const PlayerCard = ({ player, score, isTurn, powerUps, onPowerUpClick, activePow
 export default function App() {
   const [gameState, setGameState] = useState<GameState>(createInitialState());
   const [activePowerUp, setActivePowerUp] = useState<{ id: string, player: Player } | null>(null);
+  
+  // Avatar Editing State
+  const [cameraPlayer, setCameraPlayer] = useState<Player>(null);
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const openAvatarEditor = async (player: Player) => {
+    setCameraPlayer(player);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 300, height: 300 } });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch (err) {
+      console.error("Camera access denied or unavailable", err);
+      setIsEmojiPickerOpen(true);
+    }
+  };
+
+  const capturePhoto = () => {
+    if (videoRef.current && canvasRef.current && cameraPlayer) {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const dataUri = canvas.toDataURL('image/jpeg');
+        updateAvatar(cameraPlayer, dataUri);
+        closeCamera();
+      }
+    }
+  };
+
+  const closeCamera = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach(track => track.stop());
+    }
+    setCameraPlayer(null);
+    setIsEmojiPickerOpen(false);
+  };
+
+  const updateAvatar = (player: Player, avatar: string) => {
+    setGameState(prev => ({
+      ...prev,
+      playerInfo: {
+        ...prev.playerInfo,
+        [player!]: { ...prev.playerInfo[player!], avatar }
+      }
+    }));
+  };
+
+  const selectEmoji = (emoji: string) => {
+    if (cameraPlayer) {
+      updateAvatar(cameraPlayer, emoji);
+      closeCamera();
+    }
+  };
 
   useEffect(() => {
     if (gameState.status !== 'playing' || gameState.isPaused) return;
@@ -114,10 +211,12 @@ export default function App() {
         if (prev.isPaused) return prev;
         if (prev.timeLeft <= 0) {
           // Time's up, switch player
+          const nextLimit = prev.nextTurnTimeLimit || 5;
           return {
             ...prev,
             currentPlayer: prev.currentPlayer === 'X' ? 'O' : 'X',
-            timeLeft: 5,
+            timeLeft: nextLimit,
+            nextTurnTimeLimit: undefined, // Reset after use
           };
         }
         return { ...prev, timeLeft: prev.timeLeft - 1 };
@@ -142,7 +241,28 @@ export default function App() {
 
   const handlePowerUpClick = (powerUpId: string, player: Player) => {
     if (gameState.currentPlayer !== player || gameState.status !== 'playing') return;
+    
+    // Immediate power-ups (like Sabotage) can be triggered immediately without selecting a cell
+    if (powerUpId === 'sabotage') {
+      applySabotage(player);
+      return;
+    }
+
     setActivePowerUp(activePowerUp?.id === powerUpId ? null : { id: powerUpId, player });
+  };
+
+  const applySabotage = (currentPlayer: Player) => {
+    const newPowerUps = { ...gameState.powerUps };
+    newPowerUps[currentPlayer!] = newPowerUps[currentPlayer!]?.map(p => 
+      p.id === 'sabotage' ? { ...p, count: p.count - 1 } : p
+    ).filter(p => p.count > 0) || [];
+
+    setGameState(prev => ({
+      ...prev,
+      powerUps: newPowerUps,
+      nextTurnTimeLimit: 1, // Next player will only have 1 second
+    }));
+    // Note: Sabotage doesn't end the current turn, it affects the NEXT turn.
   };
 
   const applyPowerUp = (sgIndex: number, cIndex: number) => {
@@ -202,13 +322,16 @@ export default function App() {
     if (overallWinner) nextStatus = overallWinner === 'X' ? 'X_wins' : 'O_wins';
     else if (boardWithWinners.every((g: any) => g.winner || g.isFull)) nextStatus = 'draw';
 
+    const nextLimit = gameState.nextTurnTimeLimit || 5;
+
     setGameState(prev => ({
       ...prev,
       board: boardWithWinners,
       currentPlayer: prev.currentPlayer === 'X' ? 'O' : 'X',
       status: nextStatus,
       powerUps: newPowerUps || prev.powerUps,
-      timeLeft: 5,
+      timeLeft: nextLimit,
+      nextTurnTimeLimit: undefined, // Reset after use
     }));
   };
 
@@ -301,9 +424,16 @@ export default function App() {
         
         {/* Joueur X */}
         <PlayerCard 
-          player="X" score={gameState.scores.X} isTurn={gameState.currentPlayer === 'X'} 
-          powerUps={gameState.powerUps.X} onPowerUpClick={(id) => handlePowerUpClick(id, 'X')}
+          player="X" 
+          name={gameState.playerInfo.X.name}
+          avatar={gameState.playerInfo.X.avatar}
+          score={gameState.scores.X} 
+          isTurn={gameState.currentPlayer === 'X'} 
+          powerUps={gameState.powerUps.X} 
+          onPowerUpClick={(id) => handlePowerUpClick(id, 'X')}
           activePowerUpId={activePowerUp?.player === 'X' ? activePowerUp.id : null}
+          onAvatarClick={() => openAvatarEditor('X')}
+          isEditable={gameState.status === 'waiting'}
         />
 
         {/* Plateau Central - Responsive & Flexible */}
@@ -359,9 +489,16 @@ export default function App() {
 
         {/* Joueur O */}
         <PlayerCard 
-          player="O" score={gameState.scores.O} isTurn={gameState.currentPlayer === 'O'} 
-          powerUps={gameState.powerUps.O} onPowerUpClick={(id) => handlePowerUpClick(id, 'O')}
+          player="O" 
+          name={gameState.playerInfo.O.name}
+          avatar={gameState.playerInfo.O.avatar}
+          score={gameState.scores.O} 
+          isTurn={gameState.currentPlayer === 'O'} 
+          powerUps={gameState.powerUps.O} 
+          onPowerUpClick={(id) => handlePowerUpClick(id, 'O')}
           activePowerUpId={activePowerUp?.player === 'O' ? activePowerUp.id : null}
+          onAvatarClick={() => openAvatarEditor('O')}
+          isEditable={gameState.status === 'waiting'}
         />
 
       </main>
@@ -429,6 +566,82 @@ export default function App() {
                   </button>
                 </>
               )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal Éditeur d'Avatar */}
+      <AnimatePresence>
+        {cameraPlayer && (
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/95 backdrop-blur-md p-6"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }}
+              className="bg-slate-900 p-8 rounded-2xl text-center max-w-sm w-full border border-white/10 shadow-2xl"
+            >
+              <h2 className="text-xl font-black mb-6 uppercase italic tracking-tighter text-white">
+                Changer l'Avatar : {gameState.playerInfo[cameraPlayer!].name}
+              </h2>
+
+              {!isEmojiPickerOpen ? (
+                <div className="flex flex-col gap-6">
+                  <div className="relative aspect-square w-full bg-black rounded-xl overflow-hidden border-2 border-white/10">
+                    <video 
+                      ref={videoRef} 
+                      autoPlay 
+                      playsInline 
+                      className="w-full h-full object-cover mirror"
+                    />
+                    <canvas ref={canvasRef} className="hidden" />
+                  </div>
+                  <div className="flex gap-3">
+                    <button 
+                      onClick={capturePhoto}
+                      className="flex-1 py-3 bg-white text-slate-950 rounded-xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2 hover:bg-slate-200 transition-all"
+                    >
+                      <Camera className="w-4 h-4" /> Capturer
+                    </button>
+                    <button 
+                      onClick={() => setIsEmojiPickerOpen(true)}
+                      className="p-3 bg-white/5 text-white rounded-xl border border-white/10 hover:bg-white/10 transition-all"
+                      title="Choisir un emoji"
+                    >
+                      <Smile className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-6">
+                  <div className="grid grid-cols-4 gap-3">
+                    {['👤', '🤖', '👾', '🦊', '🐱', '🐲', '🚀', '🔥', '⚡️', '🌟', '💎', '🎯'].map(emoji => (
+                      <button 
+                        key={emoji}
+                        onClick={() => selectEmoji(emoji)}
+                        className="aspect-square bg-white/5 rounded-xl text-2xl flex items-center justify-center hover:bg-white/10 border border-white/10 transition-all"
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                  <button 
+                    onClick={() => setIsEmojiPickerOpen(false)}
+                    className="py-3 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-white transition-colors"
+                  >
+                    Retour à la Caméra
+                  </button>
+                </div>
+              )}
+
+              <button 
+                onClick={closeCamera}
+                className="mt-6 w-full py-3 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-red-400 transition-colors"
+              >
+                Annuler
+              </button>
             </motion.div>
           </motion.div>
         )}

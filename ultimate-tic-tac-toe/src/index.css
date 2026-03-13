@@ -30,6 +30,10 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
+.mirror {
+  transform: scaleX(-1);
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;
