@@ -1,0 +1,438 @@
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  Trophy, 
+  RotateCcw, 
+  Zap, 
+  Eraser, 
+  ChevronRight,
+  User,
+  Lock,
+  Clock,
+  Play,
+  Pause,
+} from 'lucide-react';
+import { 
+  createInitialState, 
+  checkWin, 
+  Player, 
+  GameState,
+  PowerUp,
+  GameStatus
+} from './logic/game';
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+/** Utility for Tailwind classes */
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+
+// --- Sub-components ---
+
+interface PlayerCardProps {
+  player: 'X' | 'O';
+  score: number;
+  isTurn: boolean;
+  powerUps: PowerUp[];
+  onPowerUpClick: (id: string) => void;
+  activePowerUpId: string | null;
+}
+
+const PlayerCard = ({ player, score, isTurn, powerUps, onPowerUpClick, activePowerUpId }: PlayerCardProps) => {
+  const isX = player === 'X';
+  const color = isX ? "text-blue-400" : "text-pink-400";
+  const bgActive = isX ? "bg-blue-500/20" : "bg-pink-500/20";
+  const borderActive = isX ? "border-blue-500" : "border-pink-500";
+
+  return (
+    <div className={cn(
+      "w-full md:w-48 p-5 rounded-xl border transition-all duration-300",
+      isTurn ? cn("bg-slate-800/80 border-2", borderActive) : "bg-slate-900 border-white/10 opacity-60"
+    )}>
+      <div className="flex items-center gap-3 mb-4">
+        <div className={cn("p-2 rounded-lg", bgActive)}>
+          <User className={cn("w-5 h-5", color)} />
+        </div>
+        <div>
+          <h3 className="text-[9px] font-black uppercase tracking-widest text-slate-400">Joueur</h3>
+          <p className={cn("text-lg font-black tracking-tight leading-none", color)}>{player}</p>
+        </div>
+      </div>
+
+      <div className="py-4 border-y border-white/5 mb-4">
+        <h3 className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Score</h3>
+        <p className="text-3xl font-mono font-black text-white">{score}</p>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <h4 className="text-[9px] font-black uppercase tracking-widest text-slate-400">Pouvoirs</h4>
+        <div className="flex gap-2">
+          {powerUps.map((p) => (
+            <div key={p.id} className="relative group">
+              <button
+                onClick={() => onPowerUpClick(p.id)}
+                className={cn(
+                  "relative w-10 h-10 rounded-lg flex items-center justify-center transition-all border-2",
+                  activePowerUpId === p.id 
+                    ? cn(bgActive, borderActive, "scale-110 shadow-lg") 
+                    : "bg-slate-800 border-white/10 hover:border-white/20 active:scale-90"
+                )}
+              >
+                {p.id === 'erase' && <Eraser className={cn("w-4 h-4", color)} />}
+                {p.id === 'block' && <Lock className={cn("w-4 h-4", color)} />}
+                {p.id === 'swap' && <Zap className={cn("w-4 h-4", color)} />}
+                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 bg-slate-700 rounded-full text-[8px] flex items-center justify-center font-black border border-slate-900 text-white">
+                  {p.count}
+                </span>
+              </button>
+              
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-2 py-1.5 bg-slate-800 border border-white/10 rounded text-[9px] w-28 text-center pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-2xl">
+                <p className="font-black uppercase text-white">{p.name}</p>
+                <p className="text-slate-400 leading-tight">{p.description}</p>
+                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- Main App ---
+
+export default function App() {
+  const [gameState, setGameState] = useState<GameState>(createInitialState());
+  const [activePowerUp, setActivePowerUp] = useState<{ id: string, player: Player } | null>(null);
+
+  useEffect(() => {
+    if (gameState.status !== 'playing' || gameState.isPaused) return;
+    
+    const interval = setInterval(() => {
+      setGameState(prev => {
+        if (prev.isPaused) return prev;
+        if (prev.timeLeft <= 0) {
+          // Time's up, switch player
+          return {
+            ...prev,
+            currentPlayer: prev.currentPlayer === 'X' ? 'O' : 'X',
+            timeLeft: 5,
+          };
+        }
+        return { ...prev, timeLeft: prev.timeLeft - 1 };
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [gameState.status, gameState.currentPlayer, gameState.isPaused]);
+
+  const togglePause = () => {
+    setGameState(prev => ({ ...prev, isPaused: !prev.isPaused }));
+  };
+
+  const startGame = () => {
+    setGameState(prev => ({ ...prev, status: 'playing', isPaused: false }));
+  };
+
+  const resetGame = () => {
+    setGameState(createInitialState());
+    setActivePowerUp(null);
+  };
+
+  const handlePowerUpClick = (powerUpId: string, player: Player) => {
+    if (gameState.currentPlayer !== player || gameState.status !== 'playing') return;
+    setActivePowerUp(activePowerUp?.id === powerUpId ? null : { id: powerUpId, player });
+  };
+
+  const applyPowerUp = (sgIndex: number, cIndex: number) => {
+    if (!activePowerUp) return;
+    
+    const newBoard = [...gameState.board];
+    const newSmallGrid = { ...newBoard[sgIndex] };
+    const newCells = [...newSmallGrid.cells];
+    const targetCell = newCells[cIndex];
+    const currentPlayer = activePowerUp.player!;
+    const opponent = currentPlayer === 'X' ? 'O' : 'X';
+
+    let success = false;
+
+    if (activePowerUp.id === 'erase' && targetCell.player === opponent) {
+      newCells[cIndex] = { player: null, blockedTurns: 0 };
+      success = true;
+    } else if (activePowerUp.id === 'block' && !targetCell.player && !targetCell.blockedTurns) {
+      newCells[cIndex] = { ...targetCell, blockedTurns: 2 };
+      success = true;
+    } else if (activePowerUp.id === 'swap' && targetCell.player === opponent) {
+      newCells[cIndex] = { ...targetCell, player: currentPlayer };
+      success = true;
+    }
+
+    if (success) {
+      newSmallGrid.cells = newCells;
+      newBoard[sgIndex] = newSmallGrid;
+      const newPowerUps = { ...gameState.powerUps };
+      newPowerUps[currentPlayer] = newPowerUps[currentPlayer]?.map(p => 
+        p.id === activePowerUp.id ? { ...p, count: p.count - 1 } : p
+      ).filter(p => p.count > 0) || [];
+
+      endTurn(newBoard, newPowerUps);
+      setActivePowerUp(null);
+    }
+  };
+
+  const endTurn = (newBoard: any, newPowerUps: any) => {
+    const boardWithUpdatedBlocks = newBoard.map((grid: any) => ({
+      ...grid,
+      cells: grid.cells.map((cell: any) => ({
+        ...cell,
+        blockedTurns: Math.max(0, (cell.blockedTurns || 0) - 1)
+      }))
+    }));
+
+    const boardWithWinners = boardWithUpdatedBlocks.map((grid: any) => {
+      const winner = checkWin(grid.cells);
+      const isFull = grid.cells.every((c: any) => c.player !== null);
+      return { ...grid, winner, isFull };
+    });
+
+    const winners = boardWithWinners.map((g: any) => g.winner);
+    const overallWinner = checkWin(winners);
+    let nextStatus: GameStatus = gameState.status;
+    if (overallWinner) nextStatus = overallWinner === 'X' ? 'X_wins' : 'O_wins';
+    else if (boardWithWinners.every((g: any) => g.winner || g.isFull)) nextStatus = 'draw';
+
+    setGameState(prev => ({
+      ...prev,
+      board: boardWithWinners,
+      currentPlayer: prev.currentPlayer === 'X' ? 'O' : 'X',
+      status: nextStatus,
+      powerUps: newPowerUps || prev.powerUps,
+      timeLeft: 5,
+    }));
+  };
+
+  const handleCellClick = (smallGridIndex: number, cellIndex: number) => {
+    if (gameState.status !== 'playing') return;
+    if (activePowerUp) { applyPowerUp(smallGridIndex, cellIndex); return; }
+    
+    const targetGrid = gameState.board[smallGridIndex];
+    const targetCell = targetGrid.cells[cellIndex];
+    if (targetCell.blockedTurns && targetCell.blockedTurns > 0) return;
+    if (targetGrid.winner || targetCell.player) return;
+
+    const newBoard = [...gameState.board];
+    const newSmallGrid = { ...newBoard[smallGridIndex] };
+    const newCells = [...newSmallGrid.cells];
+    newCells[cellIndex] = { player: gameState.currentPlayer, blockedTurns: 0 };
+    newSmallGrid.cells = newCells;
+    newBoard[smallGridIndex] = newSmallGrid;
+
+    endTurn(newBoard, null);
+  };
+
+  return (
+    <div className="min-h-screen w-full bg-slate-950 text-slate-100 flex flex-col font-sans overflow-x-hidden">
+      
+      {/* Background Decor */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div className="absolute top-1/2 left-1/4 -translate-y-1/2 w-[300px] h-[300px] bg-blue-500/5 blur-[100px] rounded-full" />
+        <div className="absolute top-1/2 right-1/4 -translate-y-1/2 w-[300px] h-[300px] bg-pink-500/5 blur-[100px] rounded-full" />
+      </div>
+
+      {/* Header Minimaliste */}
+      <header className="w-full h-16 border-b border-white/5 flex items-center justify-between px-6 lg:px-10 bg-slate-950/90 backdrop-blur-xl sticky top-0 z-40">
+        <div className="flex items-center gap-8">
+          <h1 className="text-sm font-black uppercase tracking-widest text-white">
+            Ultimate Tic Tac Toe
+          </h1>
+          
+          <div className={cn(
+            "px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border-2 flex items-center gap-3",
+            gameState.currentPlayer === 'X' ? "border-blue-500/30 text-blue-400 bg-blue-500/5" : "border-pink-500/30 text-pink-400 bg-pink-500/5"
+          )}>
+            <span>Au tour de {gameState.currentPlayer}</span>
+            <div className="w-px h-3 bg-white/10" />
+            <div className="flex items-center gap-1.5 min-w-[45px]">
+              <Clock className={cn("w-3 h-3", gameState.timeLeft <= 2 ? "text-red-500 animate-pulse" : "opacity-50")} />
+              <span className={cn(gameState.timeLeft <= 2 && "text-red-500")}>{gameState.timeLeft}s</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Timer Progress Bar */}
+        <div className="absolute bottom-0 left-0 w-full h-[1px] bg-white/5">
+          <motion.div 
+            initial={{ width: "100%" }}
+            animate={{ width: `${(gameState.timeLeft / 5) * 100}%` }}
+            transition={{ duration: 1, ease: "linear" }}
+            className={cn(
+              "h-full transition-colors",
+              gameState.timeLeft <= 2 ? "bg-red-500" : (gameState.currentPlayer === 'X' ? "bg-blue-500" : "bg-pink-500")
+            )}
+          />
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={togglePause}
+            disabled={gameState.status !== 'playing'}
+            className={cn(
+              "flex items-center gap-2 px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 border",
+              gameState.isPaused ? "bg-white text-slate-950 border-white" : "bg-white/5 text-slate-400 border-white/10 hover:bg-white/10",
+              gameState.status !== 'playing' && "opacity-0 pointer-events-none"
+            )}
+          >
+            {gameState.isPaused ? <Play className="w-3 h-3" /> : <Pause className="w-3 h-3" />}
+            {gameState.isPaused ? "Reprendre" : "Pause"}
+          </button>
+
+          <button 
+            onClick={resetGame}
+            className="flex items-center gap-2 px-4 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[10px] font-black uppercase tracking-widest text-slate-400 transition-all active:scale-95"
+          >
+            <RotateCcw className="w-3 h-3" /> Reset
+          </button>
+        </div>
+      </header>
+
+      {/* Zone de Jeu */}
+      <main className="relative z-10 flex-1 flex flex-col md:flex-row items-center justify-center gap-8 lg:gap-12 p-6 max-w-6xl mx-auto w-full">
+        
+        {/* Joueur X */}
+        <PlayerCard 
+          player="X" score={gameState.scores.X} isTurn={gameState.currentPlayer === 'X'} 
+          powerUps={gameState.powerUps.X} onPowerUpClick={(id) => handlePowerUpClick(id, 'X')}
+          activePowerUpId={activePowerUp?.player === 'X' ? activePowerUp.id : null}
+        />
+
+        {/* Plateau Central - Responsive & Flexible */}
+        <div className="relative p-2 rounded-2xl bg-slate-900 border border-white/5 shadow-2xl w-full max-w-[500px]">
+          <div className="grid grid-cols-3 gap-2 aspect-square">
+            {gameState.board.map((smallGrid, sgIndex) => (
+              <div 
+                key={sgIndex}
+                className={cn(
+                  "relative grid grid-cols-3 gap-1 p-1.5 rounded-xl transition-all duration-300",
+                  "bg-slate-950 border-2 border-white/5 shadow-inner",
+                  smallGrid.winner === 'X' ? "bg-blue-500/5 border-blue-500/10" : 
+                  smallGrid.winner === 'O' ? "bg-pink-500/5 border-pink-500/10" : ""
+                )}
+              >
+                {smallGrid.cells.map((cell, cIndex) => (
+                  <button
+                    key={cIndex}
+                    onClick={() => handleCellClick(sgIndex, cIndex)}
+                    disabled={!activePowerUp && (!!cell.player || !!smallGrid.winner || (cell.blockedTurns! > 0))}
+                    className={cn(
+                      "aspect-square rounded flex items-center justify-center text-lg lg:text-xl font-black transition-all relative overflow-hidden",
+                      !cell.player && !smallGrid.winner && !(cell.blockedTurns! > 0) && "bg-white/5 hover:bg-white/10 active:scale-90",
+                      cell.player === 'X' ? "text-blue-500" : cell.player === 'O' ? "text-pink-500" : "text-white/5",
+                      cell.blockedTurns! > 0 && "bg-red-500/10 cursor-not-allowed opacity-50"
+                    )}
+                  >
+                    {cell.player || ""}
+                    {cell.blockedTurns! > 0 && <Lock className="absolute inset-0 m-auto w-3 h-3 text-red-500 opacity-40" />}
+                  </button>
+                ))}
+                
+                {/* Win Overlay */}
+                <AnimatePresence>
+                  {smallGrid.winner && (
+                    <motion.div 
+                      initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                      className="absolute inset-0 flex items-center justify-center bg-slate-950/80 rounded-xl backdrop-blur-[1px] z-10 border border-white/10"
+                    >
+                      <span className={cn(
+                        "text-3xl font-black italic tracking-tighter",
+                        smallGrid.winner === 'X' ? "text-blue-500" : "text-pink-500"
+                      )}>
+                        {smallGrid.winner}
+                      </span>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Joueur O */}
+        <PlayerCard 
+          player="O" score={gameState.scores.O} isTurn={gameState.currentPlayer === 'O'} 
+          powerUps={gameState.powerUps.O} onPowerUpClick={(id) => handlePowerUpClick(id, 'O')}
+          activePowerUpId={activePowerUp?.player === 'O' ? activePowerUp.id : null}
+        />
+
+      </main>
+
+      {/* Modal Victoire ou Attente */}
+      <AnimatePresence>
+        {(gameState.status !== 'playing' || gameState.isPaused) && (
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/95 backdrop-blur-md p-6"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }}
+              className="bg-slate-900 p-10 rounded-2xl text-center max-w-xs w-full border border-white/10 shadow-2xl"
+            >
+              {gameState.status === 'waiting' ? (
+                <>
+                  <div className="w-16 h-16 mx-auto mb-6 rounded-xl flex items-center justify-center border border-blue-500/30 text-blue-500 bg-blue-500/5">
+                    <Play className="w-8 h-8 ml-1" />
+                  </div>
+                  <h2 className="text-2xl font-black mb-2 uppercase italic tracking-tighter text-white">Prêt ?</h2>
+                  <p className="text-slate-400 mb-8 text-sm">Cliquez pour lancer la partie et activer le timer.</p>
+                  <button 
+                    onClick={startGame}
+                    className="w-full py-4 bg-white text-slate-950 rounded-xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2 hover:bg-slate-200 transition-all"
+                  >
+                    Démarrer <ChevronRight className="w-4 h-4" />
+                  </button>
+                </>
+              ) : gameState.isPaused && gameState.status === 'playing' ? (
+                <>
+                  <div className="w-16 h-16 mx-auto mb-6 rounded-xl flex items-center justify-center border border-slate-700 text-slate-400 bg-white/5">
+                    <Pause className="w-8 h-8" />
+                  </div>
+                  <h2 className="text-2xl font-black mb-2 uppercase italic tracking-tighter text-white">Pause</h2>
+                  <p className="text-slate-400 mb-8 text-sm">Le jeu est suspendu.</p>
+                  <button 
+                    onClick={togglePause}
+                    className="w-full py-4 bg-white text-slate-950 rounded-xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2 hover:bg-slate-200 transition-all"
+                  >
+                    Reprendre <Play className="w-4 h-4 ml-1" />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className={cn(
+                    "w-16 h-16 mx-auto mb-6 rounded-xl flex items-center justify-center border",
+                    gameState.status === 'X_wins' ? "text-blue-500 border-blue-500/30 bg-blue-500/5" : 
+                    gameState.status === 'O_wins' ? "text-pink-500 border-pink-500/30 bg-pink-500/5" : "text-slate-400 border-slate-700"
+                  )}>
+                    <Trophy className="w-8 h-8" />
+                  </div>
+                  <h2 className="text-2xl font-black mb-2 uppercase italic tracking-tighter text-white">
+                    {gameState.status === 'draw' ? "Match Nul" : "Victoire"}
+                  </h2>
+                  <p className="text-slate-400 mb-8 text-sm">
+                    {gameState.status === 'X_wins' ? "Le Joueur X a gagné." : 
+                     gameState.status === 'O_wins' ? "Le Joueur O a gagné." : "Match nul."}
+                  </p>
+                  <button 
+                    onClick={resetGame}
+                    className="w-full py-4 bg-white text-slate-950 rounded-xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2 hover:bg-slate-200 transition-all"
+                  >
+                    Rejouer <ChevronRight className="w-4 h-4" />
+                  </button>
+                </>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
