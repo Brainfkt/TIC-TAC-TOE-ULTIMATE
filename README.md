@@ -1,42 +1,48 @@
-# TicTacToe Console Game
+# ⚡️ Ultimate Power Tic-Tac-Toe
 
-> A simple Tic Tac Toe game in C for the console, with French/English language support and colored output (blue and red).
+Une version moderne, stratégique et compétitive du Tic-Tac-Toe classique, développée avec une stack haute performance.
 
-## Description
+![Static Badge](https://img.shields.io/badge/Stack-Rust_%7C_Tauri_%7C_React-blue)
+![Static Badge](https://img.shields.io/badge/Design-Premium_Dark-black)
 
-This program lets you play the classic Tic Tac Toe (also known as Noughts and Crosses) in a local two-player mode.  
-- **Available languages**: French or English (select at startup).  
-- **Colored display**: uses ANSI codes (blue for `X`, red for `O`).  
-- **Score and history**: scores are tracked during the session, and an `historique.txt` file is created to log match results.
+## ✨ Caractéristiques
 
-## Features
+*   **Grille Ultimate 9x9** : Une profondeur stratégique démultipliée. Gagnez des mini-grilles pour conquérir le plateau global.
+*   **Système de Timer Dynamique** : Chaque joueur dispose de **5 secondes** pour agir. Le stress est au rendez-vous !
+*   **Pouvoirs Spéciaux (Power-ups)** :
+    *   ⏳ **Sabotage** : Réduit le prochain tour de l'adversaire à **1 seconde**.
+    *   🔒 **Bloqueur** : Verrouille une case vide pendant un tour complet.
+    *   ⚡ **Voleur** : Convertit une pièce adverse en votre couleur.
+*   **Personnalisation d'Avatar** : Prenez une photo avec votre caméra ou choisissez un emoji avant de lancer la partie.
+*   **Interface sobre & fluide** : Un design "Premium Dark" minimaliste optimisé pour la concentration et la lisibilité.
 
-- Language selection (French/English).
-- Prompts for player names (Player 1 = X, Player 2 = O).
-- Displays the score (wins, losses, draws).
-- Saves results in `historique.txt`.
+## 🛠 Stack Technique
 
-## Requirements
+*   **Backend** : [Rust](https://www.rust-lang.org/) avec [Tauri v2](https://tauri.app/) (Performance native & sécurité).
+*   **Frontend** : [React](https://reactjs.org/) + [TypeScript](https://www.typescriptlang.org/).
+*   **Styling** : [Tailwind CSS v4](https://tailwindcss.com/) pour une interface ultra-rapide et responsive.
+*   **Animations** : [Framer Motion](https://www.framer.com/motion/) pour des transitions fluides.
 
-- A C compiler (GCC, Clang, MinGW, etc.).
-- A terminal that supports ANSI color codes (most modern terminals do).
+## 🚀 Installation & Lancement
 
-## Installation
+### Prérequis
+- [Rust](https://www.rust-lang.org/tools/install)
+- [Node.js](https://nodejs.org/)
 
-1. **Clone the repository** (or download the ZIP archive):
+### Lancement en développement
+1. Clonez le dépôt.
+2. Naviguez dans le dossier du projet :
    ```bash
-   git clone https://github.com/Brainfkt/TIC-TAC-TOE.git
-   cd TIC-TAC-TOE
+   cd ultimate-tic-tac-toe
+   ```
+3. Installez les dépendances :
+   ```bash
+   npm install
+   ```
+4. Lancez l'application :
+   ```bash
+   npm run tauri dev
    ```
 
-2. **Compile and execute the code:**
-   
-     Linux/Mac:
-   ```bash
-   gcc -o tictactoe tictactoe.c
-   ./tictactoe
-   ```
-     Windows:
-   ```bash
-   gcc -o tictactoe.exe tictactoe.c
-   tictactoe.exe
+## ⚖️ Licence
+Ce projet est sous licence MIT. Voir le fichier `LICENSE` pour plus de détails.
