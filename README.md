@@ -1,6 +1,6 @@
 # ⚡️ Ultimate Power Tic-Tac-Toe
 
-Une version moderne, stratégique et compétitive du Tic-Tac-Toe classique, développée avec une stack haute performance.
+Une version moderne, stratégique et compétitive du Tic-Tac-Toe classique.
 
 ![Static Badge](https://img.shields.io/badge/Stack-Rust_%7C_Tauri_%7C_React-blue)
 ![Static Badge](https://img.shields.io/badge/Design-Premium_Dark-black)
