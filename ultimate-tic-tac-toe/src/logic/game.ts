@@ -48,9 +48,9 @@ export interface GameState {
 }
 
 export const INITIAL_POWER_UPS: PowerUp[] = [
-  { id: 'sabotage', name: 'Sabotage', description: 'Réduit le prochain tour de l\'adversaire à 1 seconde.', count: 1 },
-  { id: 'block', name: 'Bloqueur', description: 'Bloque une case pendant 1 tour.', count: 1 },
-  { id: 'swap', name: 'Voleur', description: 'Remplace une pièce adverse par la vôtre.', count: 1 },
+  { id: 'sabotage', name: 'Sabotage', description: 'Réduit le prochain tour de l\'adversaire à 1 seconde.', count: 3 },
+  { id: 'block', name: 'Bloqueur', description: 'Bloque une case pendant 1 tour.', count: 3 },
+  { id: 'swap', name: 'Voleur', description: 'Remplace une pièce adverse par la vôtre.', count: 3 },
 ];
 
 export const createInitialState = (): GameState => ({

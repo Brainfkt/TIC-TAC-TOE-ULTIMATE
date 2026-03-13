@@ -326,8 +326,23 @@ export default function App() {
       newCells[cIndex] = { player: null, blockedTurns: 0 };
       success = true;
     } else if (activePowerUp.id === 'block' && !targetCell.player && !targetCell.blockedTurns) {
-      newCells[cIndex] = { ...targetCell, blockedTurns: 2 };
-      success = true;
+      newCells[cIndex] = { ...targetCell, blockedTurns: 2 }; // Reduced to 2
+      newSmallGrid.cells = newCells;
+      newBoard[sgIndex] = newSmallGrid;
+      
+      const newPowerUps = { ...gameState.powerUps };
+      newPowerUps[currentPlayer] = newPowerUps[currentPlayer]?.map(p => 
+        p.id === activePowerUp.id ? { ...p, count: p.count - 1 } : p
+      ).filter(p => p.count > 0) || [];
+
+      setGameState(prev => ({
+        ...prev,
+        board: newBoard,
+        powerUps: newPowerUps,
+        // We DON'T change currentPlayer or timeLeft
+      }));
+      setActivePowerUp(null);
+      return; // Return early, don't end turn
     } else if (activePowerUp.id === 'swap' && targetCell.player === opponent) {
       newCells[cIndex] = { ...targetCell, player: currentPlayer };
       success = true;
